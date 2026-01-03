@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Acompanhamento veterinário</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    label { display: block; margin-top: 8px; }
+    input, textarea { width: 100%; max-width: 400px; }
+    button { margin-top: 10px; }
+    .registro { border: 1px solid #ccc; padding: 8px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Acompanhamento do cachorro</h1>
+
+  <form id="form-registro">
+    <label>Data
+      <input type="date" id="data" required>
+    </label>
+    <label>Peso (kg)
+      <input type="number" id="peso" step="0.1" required>
+    </label>
+    <label>Observações
+      <textarea id="obs" rows="3"></textarea>
+    </label>
+    <button type="submit">Salvar registro</button>
+  </form>
+
+  <h2>Registros salvos</h2>
+  <div id="lista-registros"></div>
+
+  <!-- SDKs do Firebase (versão modular simples) -->
+  <script type="module">
+    // 1. Importar funções básicas do Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
+
+    // 2. SUA configuração - troque pelos dados do console do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyDbKzICgL6dgYz18zwf98WpaOZNcJ_sGSk",
+      authDomain: "bono-vet.firebaseapp.com",
+      databaseURL: "https://bono-vet-default-rtdb.firebaseio.com",
+      projectId: "bono-vet",
+      storageBucket: "bono-vet.firebasestorage.app",
+      messagingSenderId: "922268528742",
+      appId: "1:922268528742:web:be2b877ca6cd77144b3da7"
+    };
+
+    // 3. Inicializar Firebase e o banco
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const form = document.getElementById("form-registro");
+    const divLista = document.getElementById("lista-registros");
+
+    // 4. Enviar os dados para o Firebase
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const data = document.getElementById("data").value;
+      const peso = document.getElementById("peso").value;
+      const obs = document.getElementById("obs").value;
+
+      // cria um novo registro em /registros
+      const registrosRef = ref(db, "registros");
+      await push(registrosRef, {
+        data,
+        peso,
+        obs,
+        criadoEm: new Date().toISOString()
+      });
+
+      form.reset();
+      alert("Registro salvo!");
+    });
+
+    // 5. Ler os dados em tempo real
+    const registrosRef = ref(db, "registros");
+    onValue(registrosRef, (snapshot) => {
+      const dados = snapshot.val();
+      divLista.innerHTML = ""; // limpa a lista
+
+      if (!dados) {
+        divLista.innerHTML = "<p>Ainda não há registros.</p>";
+        return;
+      }
+
+      // Object.entries converte o objeto em lista [id, registro]
+      const lista = Object.entries(dados);
+
+      // ordenar por data de criação (opcional)
+      lista.sort((a, b) => {
+        const d1 = new Date(a[1].criadoEm || 0);
+        const d2 = new Date(b[1].criadoEm || 0);
+        return d2 - d1;
+      });
+
+      for (const [id, reg] of lista) {
+        const div = document.createElement("div");
+        div.className = "registro";
+        div.innerHTML = `
+          <strong>Data:</strong> ${reg.data || "-"}<br>
+          <strong>Peso:</strong> ${reg.peso || "-"} kg<br>
+          <strong>Obs:</strong> ${reg.obs || ""}<br>
+          <small>ID: ${id}</small>
+        `;
+        divLista.appendChild(div);
+      }
+    });
+  </script>
+</body>
+</html>
