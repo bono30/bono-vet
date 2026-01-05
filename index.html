@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Bono Vet - Acompanhamento</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    nav a {
+      margin-right: 15px;
+      cursor: pointer;
+      text-decoration: underline;
+      color: blue;
+    }
+    h1, h2 { margin-bottom: 10px; }
+    label { display: block; margin-top: 8px; }
+    input, textarea, select {
+      width: 100%;
+      max-width: 400px;
+    }
+    button { margin-top: 10px; }
+    .registro {
+      border: 1px solid #ccc;
+      padding: 8px;
+      margin-top: 10px;
+    }
+    .bloco {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 15px;
+    }
+    #foto-preview {
+      margin-top: 10px;
+      max-width: 200px;
+      display: block;
+    }
+    section { display: none; margin-top: 15px; }
+    section.ativo { display: block; }
+    .botoes-exame button,
+    .botoes-receita button,
+    .botoes-registro button { margin-right: 5px; margin-top: 5px; }
+    #area-app { display: none; }
+    #info-usuario-barra {
+      display: none;
+      margin: 10px 0;
+      padding: 8px;
+      background: #f3f3f3;
+      border: 1px solid #ccc;
+      font-size: 0.9rem;
+    }
+    #info-usuario-barra span {
+      font-weight: bold;
+    }
+    .comentario { margin-top: 5px; padding:4px; border-left:3px solid #ccc; font-size:0.9rem; }
+    #link-esqueci-senha {
+      margin-top: 5px;
+      display: inline-block;
+      font-size: 0.85rem;
+      color: blue;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    #box-reset-senha {
+      display: none;
+      margin-top: 10px;
+      padding: 8px;
+      border: 1px dashed #ccc;
+      background: #fafafa;
+      font-size: 0.9rem;
+    }
+    .filtros {
+      margin-top: 10px;
+      padding: 8px;
+      background: #f7f7f7;
+      border: 1px solid #ddd;
+      font-size: 0.9rem;
+    }
+    .filtros label {
+      display: inline-block;
+      margin-right: 10px;
+    }
+    .filtros input,
+    .filtros select {
+      width: auto;
+      max-width: 200px;
+    }
+    /* Área de gráficos de exames */
+    #sec-graficos-exames {
+      margin-top: 15px;
+      border-top: 1px dashed #ccc;
+      padding-top: 10px;
+    }
+    #lista-exames-grafico {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      padding: 6px;
+      margin-top: 6px;
+      font-size: 0.9rem;
+    }
+    #lista-exames-grafico label {
+      display: block;
+      margin: 2px 0;
+    }
+    #area-grafico-renderizado {
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      min-height: 80px;
+      font-size: 0.9rem;
+      background: #fafafa;
+      white-space: pre-wrap;
+      font-family: Consolas, monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>Bono Vet</h1>
+
+  <!-- BARRA DE USUARIO / SAIR -->
+  <div id="info-usuario-barra">
+    Logado como: <span id="info-nome-usuario"></span>
+    &lt;<span id="info-email"></span>&gt;
+    (<span id="info-tipo"></span>)
+    <button id="btn-logout" type="button">Sair</button>
+  </div>
+
+  <!-- LOGIN / CADASTRO -->
+  <div class="bloco" id="area-auth">
+    <h2>Acesso</h2>
+
+    <div id="auth-forms">
+      <div id="box-login">
+        <h3>Entrar</h3>
+        <form id="form-login">
+          <label for="login-email">E-mail</label>
+          <input type="email" id="login-email" required>
+
+          <label for="login-senha">Senha</label>
+          <input type="password" id="login-senha" required>
+
+          <button type="submit">Entrar</button>
+        </form>
+
+        <span id="link-esqueci-senha">Esqueci minha senha</span>
+
+        <div id="box-reset-senha">
+          <p>Informe seu e-mail para receber um link de redefinição de senha.</p>
+          <form id="form-reset-senha">
+            <label for="reset-email">E-mail cadastrado</label>
+            <input type="email" id="reset-email" required>
+            <button type="submit">Enviar link de redefinição</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="box-cadastro" style="margin-top:20px;">
+        <h3>Criar conta</h3>
+        <form id="form-cadastro">
+          <label for="cad-nome">Nome completo</label>
+          <input type="text" id="cad-nome" required>
+
+          <label for="cad-email">E-mail</label>
+          <input type="email" id="cad-email" required>
+
+          <label for="cad-senha">Senha</label>
+          <input type="password" id="cad-senha" required>
+
+          <label for="cad-tipo">Sou</label>
+          <select id="cad-tipo" required>
+            <option value="">Selecione</option>
+            <option value="tutor">Tutor(a)</option>
+            <option value="vet">Veterinário(a)</option>
+          </select>
+
+          <div id="area-crmv" style="display:none;">
+            <label for="cad-crmv">CRMV (UF-XXXXX)</label>
+            <input type="text" id="cad-crmv" placeholder="Ex.: MG-01234">
+          </div>
+
+          <button type="submit">Cadastrar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- APLICACAO -->
+  <div id="area-app">
+    <nav>
+      <a id="tab-dashboard">Dashboard</a>
+      <a id="tab-registros">Registros diários</a>
+      <a id="tab-exames">Exames</a>
+      <a id="tab-receitas">Receitas/Pedidos</a>
+    </nav>
+
+    <!-- DASHBOARD -->
+    <section id="sec-dashboard" class="ativo">
+      <div class="bloco">
+        <h2>Dados do cachorro</h2>
+        <form id="form-cachorro">
+          <label for="nome">Nome</label>
+          <input type="text" id="nome" required>
+
+          <label for="nascimento">Data de nascimento</label>
+          <input type="date" id="nascimento" required>
+
+          <label for="raca">Raça</label>
+          <select id="raca" required>
+            <option value="">Selecione a raça</option>
+            <option value="SRD (vira-lata)">SRD (vira-lata)</option>
+            <option value="Labrador Retriever">Labrador Retriever</option>
+            <option value="Golden Retriever">Golden Retriever</option>
+            <option value="Poodle">Poodle</option>
+            <option value="Shih Tzu">Shih Tzu</option>
+            <option value="Yorkshire Terrier">Yorkshire Terrier</option>
+            <option value="Bulldog Francês">Bulldog Francês</option>
+            <option value="Border Collie">Border Collie</option>
+            <option value="Pastor Alemão">Pastor Alemão</option>
+            <option value="Beagle">Beagle</option>
+          </select>
+
+          <label for="foto">Foto</label>
+          <input type="file" id="foto" accept="image/*">
+
+          <button type="submit" id="btn-salvar-cachorro">Salvar/Atualizar</button>
+        </form>
+        <img id="foto-preview" src="" alt="Foto do cachorro" style="display:none; max-width:200px;">
+      </div>
+
+      <div class="bloco">
+        <h2>Informações salvas</h2>
+        <p><strong>Nome:</strong> <span id="info-nome">-</span></p>
+        <p><strong>Nascimento:</strong> <span id="info-nascimento">-</span></p>
+        <p><strong>Raça:</strong> <span id="info-raca">-</span></p>
+        <img id="info-foto" src="" alt="Foto salva do cachorro" style="max-width:200px; display:none;">
+      </div>
+
+      <!-- AUTORIZACAO DE VETERINARIOS (TUTOR) -->
+      <div class="bloco" id="bloco-autorizacoes">
+        <h2>Autorizar veterinário</h2>
+        <p>Permite que um veterinário, identificado por CRMV, visualize exames, registros e registre comentários/pedidos.</p>
+        <form id="form-autorizacao">
+          <label for="nome-vet-aut">Nome do veterinário (opcional)</label>
+          <input type="text" id="nome-vet-aut">
+
+          <label for="crmv-vet-aut">CRMV do veterinário (UF-XXXXX)</label>
+          <input type="text" id="crmv-vet-aut" required>
+          <button type="submit">Autorizar veterinário</button>
+        </form>
+
+        <div class="filtros" style="margin-top:10px;">
+          <strong>Filtrar veterinários autorizados:</strong><br>
+          <label>Texto (CRMV ou nome)
+            <input type="text" id="filtro-vet-texto" placeholder="Ex.: MG-01234">
+          </label>
+          <button type="button" id="btn-limpar-filtro-vet">Limpar</button>
+        </div>
+
+        <div style="margin-top:10px;">
+          <h3>Veterinários autorizados</h3>
+          <ul id="lista-autorizados"></ul>
+        </div>
+      </div>
+
+      <!-- VISUALIZACAO DE AUTORIZACAO PARA VETS -->
+      <div class="bloco" id="bloco-info-vet" style="display:none;">
+        <h2>Informações de acesso como veterinário</h2>
+        <p id="texto-autorizacao-vet"></p>
+      </div>
+    </section>
+
+    <!-- SELECAO DE TUTOR PARA VETERINARIO -->
+    <div class="bloco" id="bloco-selecao-tutor-vet" style="display:none;">
+      <h2>Seleção de tutor (veterinário)</h2>
+      <p>
+        Quando mais de um tutor autorizar seu CRMV, escolha abaixo qual tutor deseja visualizar/atender.
+      </p>
+      <label for="select-tutor-vet">Tutor selecionado</label>
+      <select id="select-tutor-vet">
+        <option value="">Nenhum tutor selecionado</option>
+      </select>
+      <p id="info-tutor-vet" style="margin-top:8px; font-size:0.9rem; color:#555;"></p>
+    </div>
+
+    <!-- REGISTROS DIARIOS -->
+    <section id="sec-registros">
+      <!-- ... (idêntico ao seu arquivo atual) ... -->
+    </section>
+
+    <!-- EXAMES -->
+    <section id="sec-exames">
+      <!-- ... HTML dos exames exatamente como no arquivo atual ... -->
+      <div class="bloco" id="sec-graficos-exames">
+        <h2>Gráficos de exames</h2>
+        <p style="font-size:0.9rem;">
+          Selecione um tipo de exame, escolha até 10 exames da lista e clique em "Gerar gráfico".
+        </p>
+
+        <label for="grafico-tipo-exame">Tipo de exame para o gráfico</label>
+        <select id="grafico-tipo-exame">
+          <option value="">Selecione</option>
+          <option value="sangue">Exame de sangue</option>
+          <option value="imagem">Imagem</option>
+          <option value="cardio">Cardiológico</option>
+          <option value="outro">Outro</option>
+        </select>
+
+        <label for="grafico-tipo">Tipo de gráfico</label>
+        <select id="grafico-tipo">
+          <option value="linha">Linha</option>
+          <option value="barra">Barras</option>
+          <option value="pontos">Pontos</option>
+        </select>
+
+        <div style="margin-top:8px;">
+          <strong>Exames disponíveis para este tipo (máx. 10 selecionados):</strong>
+          <div id="lista-exames-grafico">
+            <em>Selecione um tipo de exame acima.</em>
+          </div>
+        </div>
+
+        <button type="button" id="btn-gerar-grafico">Gerar gráfico</button>
+
+        <div id="area-grafico-renderizado">
+          Aguardando seleção de exames e geração de gráfico.
+        </div>
+      </div>
+    </section>
+
+    <!-- RECEITAS / PEDIDOS -->
+    <section id="sec-receitas">
+      <!-- ... igual ao arquivo atual ... -->
+    </section>
+  </div>
+
+  <!-- PDF.js para ler laudos (CDN ajustada) -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.5.136/build/pdf.min.js"></script>
+  <script>
+    if (window['pdfjsLib']) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.5.136/build/pdf.worker.min.js";
+    }
+  </script>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import {
+      getDatabase, ref, set, push, onValue, remove, update
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
+    import {
+      getStorage, ref as sRef, uploadBytes, getDownloadURL
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+    import {
+      getAuth,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged,
+      sendPasswordResetEmail
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+
+    /* TODO: aqui entra todo o seu JS já existente (cadastro, registros, exames, receitas etc.)
+       EXCETO pela função analisarLaudoLaboratorial, que deve ser substituída por esta: */
+
+    // FUNÇÃO: extrair texto do PDF (idêntica à atual)
+    async function extrairTextoDoPDF(file) {
+      if (!window.pdfjsLib) {
+        throw new Error("PDF.js não carregado.");
+      }
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let textoCompleto = "";
+
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const content = await page.getTextContent();
+        const strings = content.items.map(item => item.str);
+        textoCompleto += strings.join(" ") + "\n";
+      }
+
+      return textoCompleto;
+    }
+
+    // FUNÇÃO: parser específico para laudos com bloco "FÓSFORO" (canino)
+    function analisarLaudoLaboratorial(texto) {
+      const parametros = [];
+      const linhas = texto
+        .split(/\r?\n/)
+        .map(l => l.trim())
+        .filter(l => l);
+
+      for (let i = 0; i < linhas.length; i++) {
+        const linha = linhas[i];
+        const normalizada = linha
+          .toUpperCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "");
+
+        if (normalizada === "FOSFORO") {
+          const bloco = linhas.slice(i, i + 6).join(" ");
+          const regex = /RESULTADO[^:]*:\s*([\d.,]+)\s*([a-zA-Z/%µ]+)[\s\S]*?Canino\s*:\s*([\d.,]+)\s*a\s*([\d.,]+)\s*([a-zA-Z/%µ]+)/i;
+          const m = bloco.match(regex);
+          if (m) {
+            const valorStr = m[1].replace(",", ".");
+            const unidadeResultado = (m[2] || "").trim();
+            const refMinStr = m[3].replace(",", ".");
+            const refMaxStr = m[4].replace(",", ".");
+            const unidadeRef = (m[5] || "").trim();
+
+            const valor = parseFloat(valorStr);
+            const refMin = parseFloat(refMinStr);
+            const refMax = parseFloat(refMaxStr);
+
+            if (!isNaN(valor) && !isNaN(refMin) && !isNaN(refMax)) {
+              let status = "normal";
+              if (valor < refMin) status = "baixo";
+              else if (valor > refMax) status = "alto";
+
+              const unidade = unidadeResultado || unidadeRef;
+
+              parametros.push({
+                chave: "fosforo",
+                nome: "Fósforo",
+                valor,
+                unidade,
+                refMin,
+                refMax,
+                status
+              });
+            }
+          }
+        }
+      }
+
+      console.log("Parâmetros interpretados (parser fósforo):", parametros);
+      return parametros;
+    }
+
+    /* O RESTO do seu JS (listeners, registros, exames, receitas, gráficos conceituais)
+       permanece igual ao arquivo que você já tem. */
+  </script>
+</body>
+</html>
