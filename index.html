@@ -1,0 +1,237 @@
+// RENDERIZAÇÃO COM GRÁFICO SVG (substitui a versão antiga textual)
+async function gerarGraficoExames() {
+  const tipoExameGraf = selectGraficoTipoExame.value;
+  const tipoGrafico = selectGraficoTipo.value; // ainda não usado para mudar o desenho
+  if (!tipoExameGraf) {
+    alert("Selecione o tipo de exame para o gráfico.");
+    return;
+  }
+
+  const checks = listaExamesGrafico.querySelectorAll(".chk-exame-grafico:checked");
+  if (!checks.length) {
+    alert("Selecione pelo menos um exame.");
+    return;
+  }
+  if (checks.length > 10) {
+    alert("Selecione no máximo 10 exames.");
+    return;
+  }
+
+  const ownerUid = getOwnerUidParaLeitura();
+  if (!ownerUid) {
+    alert("Nenhum tutor associado.");
+    return;
+  }
+
+  const idsSelecionados = Array.from(checks).map((c) => c.value);
+
+  // Exames básicos (data, descrição) a partir do cache
+  const examesSelecionados = examesCache
+    .filter(([id]) => idsSelecionados.includes(id))
+    .map(([id, ex]) => ({ id, ...ex }))
+    .sort((a, b) => (a.dataExame || "").localeCompare(b.dataExame || ""));
+
+  // Buscar resultados por parâmetro em /tutores/{uid}/resultadosExames
+  const resultadosRef = ref(db, `tutores/${ownerUid}/resultadosExames`);
+  const snap = await new Promise((resolve) =>
+    onValue(resultadosRef, resolve, { onlyOnce: true })
+  );
+  const todosResultados = snap.val() || {};
+
+  // Montar séries por parâmetro: { nomeParametro: [{ data, valor, unidade }] }
+  const parametros = {};
+  for (const chaveParam in todosResultados) {
+    const porExame = todosResultados[chaveParam];
+    for (const exameId in porExame) {
+      if (!idsSelecionados.includes(exameId)) continue;
+      const r = porExame[exameId];
+      if (typeof r.valor !== "number") continue;
+      const nome = r.nomeParametro || chaveParam;
+      if (!parametros[nome]) parametros[nome] = [];
+      parametros[nome].push({
+        data: r.dataExame,
+        valor: r.valor,
+        unidade: r.unidade || ""
+      });
+    }
+  }
+
+  // Se não achou nenhum valor numérico
+  if (!Object.keys(parametros).length) {
+    areaGraficoRenderizado.textContent =
+      "Nenhum valor numérico encontrado nos laudos desses exames selecionados.";
+    return;
+  }
+
+  // Normalizar e ordenar por data
+  Object.keys(parametros).forEach((nome) => {
+    parametros[nome].sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+  });
+
+  // Paleta simples
+  const cores = ["#06b6d4", "#3b82f6", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444", "#64748b"];
+
+  // Limpa área e cria título
+  areaGraficoRenderizado.innerHTML = "";
+
+  const titulo = document.createElement("h3");
+  titulo.textContent = `Gráfico de ${tipoExameGraf} (${tipoGrafico})`;
+  areaGraficoRenderizado.appendChild(titulo);
+
+  const legenda = document.createElement("div");
+  legenda.style.marginTop = "4px";
+  legenda.style.marginBottom = "8px";
+  legenda.style.fontSize = "0.85rem";
+
+  let corIndex = 0;
+
+  // Para cada parâmetro, cria um gráfico de colunas em SVG
+  for (const nomeParam of Object.keys(parametros)) {
+    const pontos = parametros[nomeParam];
+    if (pontos.length < 2) continue; // pula parâmetros com 1 ponto só
+
+    const cor = cores[corIndex % cores.length];
+    corIndex++;
+
+    const bloco = document.createElement("div");
+    bloco.style.border = "1px solid #ddd";
+    bloco.style.padding = "8px";
+    bloco.style.marginTop = "8px";
+    bloco.style.background = "#fafafa";
+
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.justifyContent = "space-between";
+    header.style.alignItems = "center";
+
+    const tituloParam = document.createElement("strong");
+    tituloParam.textContent = nomeParam;
+
+    const spanUnidade = document.createElement("span");
+    spanUnidade.style.fontSize = "0.8rem";
+    spanUnidade.style.color = "#555";
+    spanUnidade.textContent = pontos[0].unidade ? `(${pontos[0].unidade})` : "";
+
+    header.appendChild(tituloParam);
+    header.appendChild(spanUnidade);
+    bloco.appendChild(header);
+
+    // Dados numéricos
+    const valores = pontos.map((p) => p.valor);
+    const maxVal = Math.max(...valores);
+    const minVal = 0;
+    const maxEixo = maxVal === 0 ? 1 : maxVal * 1.2;
+    const range = maxEixo - minVal;
+
+    const svgWidth = 320;
+    const svgHeight = 140;
+    const margin = { top: 10, right: 10, bottom: 30, left: 30 };
+    const width = svgWidth - margin.left - margin.right;
+    const height = svgHeight - margin.top - margin.bottom;
+    const barPadding = 0.2;
+    const barWidth = width / pontos.length;
+
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${svgWidth} ${svgHeight}`);
+    svg.style.width = "100%";
+    svg.style.height = "auto";
+
+    // Eixo Y (labels)
+    const yMaxText = document.createElementNS(svgNS, "text");
+    yMaxText.setAttribute("x", (margin.left - 4).toString());
+    yMaxText.setAttribute("y", (margin.top + 6).toString());
+    yMaxText.setAttribute("text-anchor", "end");
+    yMaxText.setAttribute("font-size", "10");
+    yMaxText.setAttribute("fill", "#6b7280");
+    yMaxText.textContent = maxEixo.toFixed(1);
+    svg.appendChild(yMaxText);
+
+    const yMinText = document.createElementNS(svgNS, "text");
+    yMinText.setAttribute("x", (margin.left - 4).toString());
+    yMinText.setAttribute("y", (margin.top + height + 4).toString());
+    yMinText.setAttribute("text-anchor", "end");
+    yMinText.setAttribute("font-size", "10");
+    yMinText.setAttribute("fill", "#6b7280");
+    yMinText.textContent = minVal.toFixed(1);
+    svg.appendChild(yMinText);
+
+    const yLine = document.createElementNS(svgNS, "line");
+    yLine.setAttribute("x1", margin.left.toString());
+    yLine.setAttribute("y1", margin.top.toString());
+    yLine.setAttribute("x2", margin.left.toString());
+    yLine.setAttribute("y2", (margin.top + height).toString());
+    yLine.setAttribute("stroke", "#d1d5db");
+    yLine.setAttribute("stroke-width", "1");
+    svg.appendChild(yLine);
+
+    // Funções auxiliares
+    const getBarX = (i) => margin.left + i * barWidth;
+    const getBarY = (v) =>
+      range === 0 ? margin.top : margin.top + height - ((v - minVal) / range) * height;
+    const getBarH = (v) => (range === 0 ? height : ((v - minVal) / range) * height);
+
+    // Barras e datas
+    pontos.forEach((p, i) => {
+      const x = getBarX(i) + (barWidth * barPadding) / 2;
+      const y = getBarY(p.valor);
+      const h = getBarH(p.valor);
+
+      const rect = document.createElementNS(svgNS, "rect");
+      rect.setAttribute("x", x.toString());
+      rect.setAttribute("y", y.toString());
+      rect.setAttribute("width", (barWidth * (1 - barPadding)).toString());
+      rect.setAttribute("height", h.toString());
+      rect.setAttribute("fill", cor);
+      rect.setAttribute("opacity", "0.9");
+      rect.setAttribute(
+        "title",
+        `${p.valor} em ${new Date(p.data).toLocaleDateString("pt-BR")}`
+      );
+      svg.appendChild(rect);
+
+      const label = document.createElementNS(svgNS, "text");
+      label.setAttribute("x", (getBarX(i) + barWidth / 2).toString());
+      label.setAttribute("y", (margin.top + height + 15).toString());
+      label.setAttribute("text-anchor", "middle");
+      label.setAttribute("font-size", "10");
+      label.setAttribute("fill", "#6b7280");
+      label.textContent = new Date(p.data).toLocaleDateString("pt-BR", {
+        month: "short",
+        day: "2-digit"
+      });
+      svg.appendChild(label);
+    });
+
+    const xLine = document.createElementNS(svgNS, "line");
+    xLine.setAttribute("x1", margin.left.toString());
+    xLine.setAttribute("y1", (margin.top + height).toString());
+    xLine.setAttribute("x2", (margin.left + width).toString());
+    xLine.setAttribute("y2", (margin.top + height).toString());
+    xLine.setAttribute("stroke", "#d1d5db");
+    xLine.setAttribute("stroke-width", "1");
+    svg.appendChild(xLine);
+
+    bloco.appendChild(svg);
+    areaGraficoRenderizado.appendChild(bloco);
+
+    // item de legenda
+    const itemLeg = document.createElement("span");
+    itemLeg.style.display = "inline-flex";
+    itemLeg.style.alignItems = "center";
+    itemLeg.style.marginRight = "8px";
+    itemLeg.innerHTML =
+      `<span style="display:inline-block;width:10px;height:10px;background:${cor};border-radius:2px;margin-right:4px;"></span>` +
+      nomeParam;
+    legenda.appendChild(itemLeg);
+  }
+
+  if (legenda.childNodes.length) {
+    areaGraficoRenderizado.insertBefore(legenda, areaGraficoRenderizado.children[1]);
+  } else {
+    const aviso = document.createElement("p");
+    aviso.textContent =
+      "Foram encontrados poucos pontos por parâmetro; ajuste a seleção de exames para ver os gráficos.";
+    areaGraficoRenderizado.appendChild(aviso);
+  }
+}
